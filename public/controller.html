@@ -1,0 +1,300 @@
+<html>
+	<head>
+		<link rel='stylesheet' type='text/css' href='style.css' >
+		<meta name="viewport" content="width=device-width, initial-scale=1">
+		<link rel="stylesheet" href="http://code.jquery.com/mobile/1.4.5/jquery.mobile-1.4.5.min.css">
+		<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.1.0/jquery.min.js"></script>
+		<script src="http://code.jquery.com/mobile/1.4.5/jquery.mobile-1.4.5.min.js"></script>
+		<script src="socket.io/socket.io.js"></script>
+		<script type="text/javascript">
+			var c, ctx, grd,mouseDown=false,milliseconds=0;
+			var isChannelReady, isInitiator = false, isStarted = false;
+			var localVideo, remoteVideo, localVideoStream, remoteVideoStream,pc;
+			var dataChannel,turnReady;
+			//var isFirefox = false;
+			var socket = io();
+			var keys = [];
+			socket.on('arduino', function(msg){
+				consolelog("Arduino: " + msg);
+			});
+			
+			//Scroll to the bottom of the console every time
+			function consolelog(message) {
+				$("#console").append("\n"+message);	
+				if($("#console").length)
+       				$("#console").scrollTop($("#console")[0].scrollHeight - $("#console").height());
+			};
+			function success(msg){
+				consolelog("Success");	
+			};
+			function handleUserMedia(stream) {
+				localVideo.src = window.URL.createObjectURL(stream);
+				localVideoStream = stream;
+				createPeerConnection();
+				pc.addStream(localVideoStream);
+				socket.emit('message','controller ready');
+				//pc.createOffer(
+			};
+			function handleUserMediaError(error) {
+				consolelog(error);
+			};
+			function createPeerConnection() {
+				try {
+					var servers = null;
+					/*if(isFirefox)
+						pc = new mozRTCPeerConnection(servers);
+					else*/
+					pc = new RTCPeerConnection(servers);
+						
+					pc.onicecandidate = handleIceCandidate;
+					pc.ontrack = handleRemoteStreamAdded;
+					pc.onremovestream = handleRemoteStreamRemoved;
+					consolelog("End try createPeerConnection");
+					pc.createOffer(setLocalAndSendMessage,handleCreateOfferError);
+				} catch(e) {
+					consolelog('Failed to create PeerConnection');
+					consolelog(e);
+					return;
+				}
+			};
+			function handleIceCandidate(event) {
+				if(event.candidate) {
+					socket.emit('message',{
+						type: 'candidate',
+						label: event.candidate.sdpMLineIndex,
+						id: event.candidate.sdpMid,
+						candidate: event.candidate.candidate
+					});
+				} else {
+					consolelog("End of candidates");
+				}
+			};
+			
+			function handleRemoteStreamAdded(event) {
+				consolelog('Remote stream added');
+				remoteVideo.src = window.URL.createObjectURL(event.stream);
+				remoteVideoStream = event.stream;
+			};
+			function handleRemoteStreamRemoved(event) {
+				
+			};
+			function setLocalAndSendMessage(sessionDescription) {
+				//sessionDescription.sdp = preferOpus(sessionDescription.sdp);
+				pc.setLocalDescription(sessionDescription);
+				socket.emit('message',sessionDescription);
+			};
+			function handleCreateOfferError(e) {
+				consolelog("Create offer error");
+				consolelog(e);	
+			}
+			//ON DOCUMENT READY
+			$(function() {
+				c = document.getElementById("pilotControlsCanvas");
+				ctx = c.getContext("2d");
+				var img=document.getElementById("pilotControlsArrows");
+   				ctx.drawImage(img,0,200);					
+				
+				localVideo = document.querySelector('#localVideo');
+				remoteVideo = document.querySelector('#remoteVideo');
+				
+				consolelog("Control Page Started");
+				
+				$(document).keydown(function(e) {
+					
+					//Dont repeatedly send the call!
+					if(!keys[e.which])
+					{
+						//Enter will activate the calibration!
+						if(e.which != 13)	
+							keys[e.which] = true;
+
+						socket.emit('command','D;');
+
+						switch(e.which) {
+
+							case 37: // left
+								socket.emit('command', 'T120;');
+								consolelog('Left');
+								break;
+
+							case 38: // up
+								socket.emit('command', 'M112;');
+								consolelog('UP');
+								break;
+
+							case 39: // right
+								socket.emit('command', 'T60;');
+								break;
+
+							case 40: // down
+								socket.emit('command', 'M70;');
+								break;
+
+							default: return; // exit this handler for other keys
+						}
+					}
+				e.preventDefault(); // prevent the default action (scroll / move caret)
+				});
+				
+				$(document).keyup(function(e) {
+					//Without this if statement, lifting one key
+					if(keys[e.which]) 
+					{
+						delete keys[e.which];
+
+						switch(e.which) {
+
+							case 37: // left
+								socket.emit('command', 'T90;');
+								consolelog('Left');
+								break;
+
+							case 38: // up
+								socket.emit('command', 'M90;');
+								consolelog('UP');
+								break;
+
+							case 39: // right
+								socket.emit('command', 'T90;');
+								break;
+
+							case 40: // down
+								socket.emit('command', 'M90;');
+								break;
+
+							default: return; // exit this handler for other keys
+						}
+						//socket.emit('command', 'U;');
+					}
+				});
+				$("#calibrateESC").click(function(event){
+					consolelog("Call Calibrate");
+					//$.post( "command", { command: 'C;' }, function(msg) { /*consolelog(msg.message);*/ } );
+					socket.emit('command','C;');
+				});
+				$("#hideNotes").click(function(event){
+					$("#notesDiv").hide();
+				});
+				$("#pilotControls").mousedown(function(event) {
+					mouseDown = true;
+					//$.post("command", {command: 'D;'}, function(msg) { /*consolelog(msg);*/ });
+					socket.emit('command','D;');
+				});
+				$("#pilotControls").mouseup(function(event) {
+					mouseDown = false;
+					ctx.clearRect(0,0,300,300);
+				});
+				document.getElementById('pilotControlsArrows').draggable = false;
+				
+				//Use the mouseup function on document instead of blur
+				//This allows user to drag outside of control canvas and stay locked into that direction
+				$(document).mouseup(function(event) {
+					mouseDown = false;
+					ctx.clearRect(0,0,500,500);
+					
+					var img=document.getElementById("pilotControlsArrows");
+   				 	ctx.drawImage(img,0,200);
+					
+					//Center steering when controls are let  off
+					//$.post( "command", { command: 'U;' }, function(msg) { /*consolelog(msg.message);*/ } );
+					socket.emit('command','U;');
+				});
+				
+				$( '#pilotControls' ).mousemove(function( event ) {
+					
+					//IF MOUSEDOWN == TRUE, CONTINUE
+					if(mouseDown == false) return;
+					
+					//200 is due to the canvas being larger than the control div.
+					//it is larger to show graphics outside the control div
+					var canvasExtra = 200;
+					var yCorrected = event.pageY - (window.innerHeight - $(this).height())+canvasExtra;
+					var xcenter = 150;
+					var ycenter = 150+canvasExtra;
+					var xmid = (event.pageX + xcenter)/2;
+					var ymid = (yCorrected + ycenter)/2;
+					var r1 = Math.sqrt(Math.pow((xcenter - event.pageX),2) + Math.pow((yCorrected - ycenter),2));
+					r1 = Math.round(r1) + 20;
+					ctx.clearRect(0,0,500,500);
+					
+					var img=document.getElementById("pilotControlsArrows");
+   				 	ctx.drawImage(img,0,200);					
+					
+					grd = ctx.createRadialGradient(event.pageX, yCorrected, 5, xmid, ymid, r1);//x,y,r0,x1,y1,r1
+					grd.addColorStop(0, "rgba(80,80,170,1");
+					grd.addColorStop(0.4, "rgba(80,80,170,.3)");
+					grd.addColorStop(1, "transparent");
+					ctx.fillStyle = grd;
+					ctx.fillRect(0, 0, 500, 500);
+					
+					var steering = parseInt(event.pageX * 180 / 300);//Scaled to 180 degrees
+					steering = 180 - steering;//The steering is backwards...
+					//FIX: Motor needs to send a forward and a reverse, not just one signal. Or is it 0-180 also, 90 as no speed?
+					//var motor = parseInt(yCorrected * 180/300);
+					var motor = parseInt((yCorrected-canvasExtra) * 180 / 300);
+					motor = 180 - motor;//INVERT the signal
+					var d = new Date();
+					var now = d.getTime();
+					
+					//Update things ever X milliseconds
+					if(now - milliseconds > 150)
+					{
+						//consolelog("r1:"+r1);
+						//consolelog('T'+steering+';');
+						$("#xDisplay").val(steering);
+						$("#yDisplay").val(motor);
+						//$.post( "command", { command: 'T'+steering+';' }, function(msg) { /*consolelog(msg.message);*/ } );
+						socket.emit('command', 'T'+steering+';M'+motor+';');
+						//socket.emit('command', 'M'+motor+';');
+						//$.post( "command", { command: 'M'+motor+';' }, function(msg) { /*consolelog(msg.message);*/ } );
+						milliseconds = now;
+					}
+				});
+				
+				//VIDEO STREAM START
+				navigator.getUserMedia = navigator.getUserMedia || navigator.webkitGetUserMedia || navigator.mozGetUserMedia;
+				navigator.getUserMedia({audio:true, video:true}, handleUserMedia, handleUserMediaError);
+				if(navigator.mozGetUserMedia) {
+					/*isFirefox = true;*/
+				}
+				
+				//if(location.hostname != "localhost")
+				//	requestTurn('turnLocation');
+				
+			});//End document ready
+			
+		</script>
+	</head>
+	
+	<body>
+		<h1>Controller</h1>
+		<div id='notesDiv'>
+			<h4>Notes</h4>
+			<ul>
+				<li>Steering servo detaches when thumb is off controls</li>
+				<li>Test: Switch the ESC with the servo and see how the steering wheel control responds</li>
+				<li></li>
+			</ul>
+			<button type='button' id='calibrateESC'>Calibrate ESC</button>
+			<button type='button' id='hideNotes'>Hide Notes</button>
+		</div>
+		
+		<div id="inputDisplayDiv">
+			<label for='xDisplay'>Steering</label><input type="text" val="" id="xDisplay" /><br>
+			<label for='yDisplay'>Motor</label><input type="text" val="" id="yDisplay" />
+		</div>
+		
+		<textarea id="console"></textarea>
+		
+		<canvas id="pilotControlsCanvas" width="500" height="500"></canvas>
+		<div id="pilotControls">
+			<img id="pilotControlsArrows" src="images/pilotControlsArrows.png" />
+		</div>
+		
+		<div id="overrideBumper">
+			<br>Override<br>Bumper
+		</div>
+		<video id='remoteVideo' autoplay muted></video>
+		<video id='localVideo' autoplay muted></video>
+	</body>
+</html>

@@ -1,0 +1,99 @@
+<html>
+	<head>
+		<link rel='stylesheet' type='text/css' href='style.css' >
+		<style>
+			#console {
+				width:50%;
+				height:150px;
+				left:25%;
+				bottom:0px;
+				background-color:transparent;
+			}
+			#localVideo {
+				position:fixed;
+				top:1em;
+				right:1em;
+				margin:0px auto;
+			}
+			#remoteVideos {
+				
+			}
+			
+		</style>
+		<meta name="viewport" content="width=device-width, initial-scale=1">
+		<link rel="stylesheet" href="http://code.jquery.com/mobile/1.4.5/jquery.mobile-1.4.5.min.css">
+		<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.1.0/jquery.min.js"></script>
+		<script src="http://code.jquery.com/mobile/1.4.5/jquery.mobile-1.4.5.min.js"></script>
+		<script src='https://simplewebrtc.com/latest-v2.js'></script>
+		<script src="socket.io/socket.io.js"></script>
+		<script type="text/javascript">
+			var c, ctx, grd,mouseDown=false,milliseconds=0;
+			var socket = io();
+			var webRTC = new SimpleWebRTC({
+				localVideoEl: 'localVideo',
+				remoteVideosEl: 'remoteVideos',
+				autoRequestMedia: true,
+				url: 'https://oregon.sesinnovation.com:8091'
+			});
+			webRTC.on('readyToCall', function() {
+				webRTC.joinRoom('oregon-rover');
+			});
+			webRTC.on('channelMessage', function(peer, label, data) {
+				consolelog("Channel Message");
+				if(label !== "command")
+				{
+					consolelog("Not rover");
+					return;
+				}
+				
+				else if(data.type == 'command')
+				{
+					consolelog(data.payload);
+				}
+			});
+			socket.on('arduino', function(msg){
+				consolelog("Arduino: " + msg);
+			});
+			
+			function consolelog(message) {
+				$("#console").append("\n"+message);	
+				if($("#console").length)
+       				$("#console").scrollTop($("#console")[0].scrollHeight - $("#console").height());
+			};
+			function success(msg){
+				consolelog("Success");	
+			};
+			
+			//ON DOCUMENT READY
+			$(function() {
+				
+				$("#calibrateESC").click(function(event){
+					consolelog("Call Calibrate");
+					
+					//$.post( "command", { command: 'C;' }, function(msg) { /*consolelog(msg.message);*/ } );
+					socket.emit('command','C;');
+				});
+				
+				$("#test").click(function(event) {
+					consolelog("Clicked Test");
+					webRTC.sendDirectlyToAll("command","command", "Calibrate!!");//peer, label, data
+				});
+				
+			});//End document ready
+			
+		</script>
+	</head>
+	<body>
+		<h1></h1>
+		<video id='localVideo' autoplay muted width="200"></video>
+		<video id='remoteVideos' autoplay muted width="600"></video>
+		<button id='test' type='button'>Test!</button>
+		<div id="inputDisplayDiv">
+			<label for='xDisplay'>Steering</label><input type="text" val="" id="xDisplay" /><br>
+			<label for='yDisplay'>Motor</label><input type="text" val="" id="yDisplay" />
+		</div>
+		
+		<textarea id="console"></textarea>
+		
+	</body>
+</html>

@@ -1,0 +1,127 @@
+<html>
+	<head>
+		<link rel='stylesheet' type='text/css' href='style.css' >
+		<style>
+			#console {
+				width:50%;
+				height:150px;
+				left:25%;
+				bottom:0px;
+				background-color:transparent;
+			}
+			#localVideo {
+				width:100%;
+				height:100%;
+			}
+		</style>
+		<meta name="viewport" content="width=device-width, initial-scale=1">
+		<link rel="stylesheet" href="http://code.jquery.com/mobile/1.4.5/jquery.mobile-1.4.5.min.css">
+		<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.1.0/jquery.min.js"></script>
+		<script src="http://code.jquery.com/mobile/1.4.5/jquery.mobile-1.4.5.min.js"></script>
+		<script src="socket.io/socket.io.js"></script>
+		<script type="text/javascript">
+			var c, ctx, grd,mouseDown=false,milliseconds=0;
+			var isChannelReady, isInitiator = false, isStarted = false;
+			var localVideoStream, remoteVideoStream,pc,isFirefox = false;
+			var dataChannel,turnReady;
+			
+			var socket = io();
+			socket.on('arduino', function(msg){
+				consolelog("Arduino: " + msg);
+			});
+			
+			function consolelog(message) {
+				$("#console").append("\n"+message);	
+				if($("#console").length)
+       				$("#console").scrollTop($("#console")[0].scrollHeight - $("#console").height());
+			};
+			function success(msg){
+				consolelog("Success");	
+			};
+			function handleUserMedia(stream) {
+				localVideo.src = window.URL.createObjectURL(stream);
+				localVideoStream = stream;
+				createPeerConnection();
+				pc.addStream(localVideoStream);
+			};
+			function handleUserMediaError(error) {
+				consolelog(error);
+			};
+			function handleIceCandidate(event) {
+				if(event.candidate) {
+					sendMessage({
+						type: 'candidate',
+						label: event.candidate.sdpMLineIndex,
+						id: event.candidate.sdpMid,
+						candidate: event.candidate.candidate
+					});
+				} else {
+					consolelog("End of candidates");
+				}
+			};
+			
+			function handleRemoteStreamAdded(event) {
+				consolelog('Remote stream added');
+				remoteVideo.src = window.URL.createObjectURL(event.stream);
+				remoteVideoStream = event.stream;
+			};
+			function handleRemoteStreamRemoved(event) {
+				
+			};
+			function createPeerConnection() {
+				try {
+					var servers = null;
+					pc = new RTCPeerConnection(servers);
+					
+					pc.onicecandidate = handleIceCandidate;
+					pc.onaddstream = handleRemoteStreamAdded;
+					pc.onremovestream = handleRemoteStreamRemoved;
+				} catch(e) {
+					consolelog('Failed to create PeerConnection');
+					consolelog(e);
+					return;
+				}
+			};
+			
+			//ON DOCUMENT READY
+			$(function() {
+				
+				$("#calibrateESC").click(function(event){
+					consolelog("Call Calibrate");
+					//$.post( "command", { command: 'C;' }, function(msg) { /*consolelog(msg.message);*/ } );
+					socket.emit('command','C;');
+				});
+				
+				//Use the mouseup function on document instead of blur
+				//This allows user to drag outside of control canvas and stay locked into that direction
+				$(document).mouseup(function(event) {
+					
+				});
+				
+				//VIDEO STREAM START
+				navigator.getUserMedia = navigator.getUserMedia || navigator.webkitGetUserMedia || navigator.mozGetUserMedia;
+				navigator.getUserMedia({audio:true, video:true}, handleUserMedia, handleUserMediaError);
+				if(navigator.mozGetUserMedia) {
+					isFirefox = true;
+				}
+				
+				//if(location.hostname != "localhost")
+				//	requestTurn('turnLocation');
+				
+			});//End document ready
+			
+		</script>
+	</head>
+	
+	<body>
+		<h1>Rover</h1>
+		<div id="inputDisplayDiv">
+			<label for='xDisplay'>Steering</label><input type="text" val="" id="xDisplay" /><br>
+			<label for='yDisplay'>Motor</label><input type="text" val="" id="yDisplay" />
+		</div>
+		
+		<textarea id="console"></textarea>
+		
+		<video id='localVideo' autoplay muted></video>
+	</body>
+</html>

@@ -1,0 +1,13 @@
+{
+  "name": "Oregon-Rover",
+  "version": "0.0.0",
+  "private": true,
+  "dependencies": {
+    "body-parser": "^1.15.2",
+    "cookie-parser": "~1.4.3",
+    "debug": "~2.2.0",
+    "express": "~4.13.4",
+    "serialport": "^4.0.1",
+    "socket.io": "~1.4.5"
+  }
+}
