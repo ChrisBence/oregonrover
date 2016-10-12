@@ -5,97 +5,39 @@
 		<link rel="stylesheet" href="http://code.jquery.com/mobile/1.4.5/jquery.mobile-1.4.5.min.css">
 		<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.1.0/jquery.min.js"></script>
 		<script src="http://code.jquery.com/mobile/1.4.5/jquery.mobile-1.4.5.min.js"></script>
-		<script src="socket.io/socket.io.js"></script>
+		<script src="simplewebrtc.js"></script>
 		<script type="text/javascript">
 			var c, ctx, grd,mouseDown=false,milliseconds=0;
-			var isChannelReady, isInitiator = false, isStarted = false;
-			var localVideo, remoteVideo, localVideoStream, remoteVideoStream,pc;
-			var dataChannel,turnReady;
-			//var isFirefox = false;
-			var socket = io();
 			var keys = [];
-			socket.on('arduino', function(msg){
-				consolelog("Arduino: " + msg);
+			var webRTC = new SimpleWebRTC({
+				localVideoEl: 'localVideo',
+				remoteVideosEl: 'remoteVideos',
+				autoRequestMedia: true,
+				url: 'https://oregon.sesinnovation.com:8091'
 			});
-			
+			webRTC.on('readyToCall', function() {
+				webRTC.joinRoom('oregon-rover');
+				consolelog('Join Room');
+			});
+			webRTC.on('channelMessage', function(peer,type,data) {
+				//payload is the command object
+				$.each(data.payload, function(i,j) {
+					consolelog(i + ", " + j);
+				});
+			});
 			//Scroll to the bottom of the console every time
 			function consolelog(message) {
 				$("#console").append("\n"+message);	
 				if($("#console").length)
        				$("#console").scrollTop($("#console")[0].scrollHeight - $("#console").height());
 			};
-			function success(msg){
-				consolelog("Success");	
-			};
-			function handleUserMedia(stream) {
-				localVideo.src = window.URL.createObjectURL(stream);
-				localVideoStream = stream;
-				createPeerConnection();
-				pc.addStream(localVideoStream);
-				socket.emit('message','controller ready');
-				//pc.createOffer(
-			};
-			function handleUserMediaError(error) {
-				consolelog(error);
-			};
-			function createPeerConnection() {
-				try {
-					var servers = null;
-					/*if(isFirefox)
-						pc = new mozRTCPeerConnection(servers);
-					else*/
-					pc = new RTCPeerConnection(servers);
-						
-					pc.onicecandidate = handleIceCandidate;
-					pc.ontrack = handleRemoteStreamAdded;
-					pc.onremovestream = handleRemoteStreamRemoved;
-					consolelog("End try createPeerConnection");
-					pc.createOffer(setLocalAndSendMessage,handleCreateOfferError);
-				} catch(e) {
-					consolelog('Failed to create PeerConnection');
-					consolelog(e);
-					return;
-				}
-			};
-			function handleIceCandidate(event) {
-				if(event.candidate) {
-					socket.emit('message',{
-						type: 'candidate',
-						label: event.candidate.sdpMLineIndex,
-						id: event.candidate.sdpMid,
-						candidate: event.candidate.candidate
-					});
-				} else {
-					consolelog("End of candidates");
-				}
-			};
 			
-			function handleRemoteStreamAdded(event) {
-				consolelog('Remote stream added');
-				remoteVideo.src = window.URL.createObjectURL(event.stream);
-				remoteVideoStream = event.stream;
-			};
-			function handleRemoteStreamRemoved(event) {
-				
-			};
-			function setLocalAndSendMessage(sessionDescription) {
-				//sessionDescription.sdp = preferOpus(sessionDescription.sdp);
-				pc.setLocalDescription(sessionDescription);
-				socket.emit('message',sessionDescription);
-			};
-			function handleCreateOfferError(e) {
-				consolelog("Create offer error");
-				consolelog(e);	
-			}
 			//ON DOCUMENT READY
 			$(function() {
 				c = document.getElementById("pilotControlsCanvas");
 				ctx = c.getContext("2d");
 				var img=document.getElementById("pilotControlsArrows");
    				ctx.drawImage(img,0,200);					
-				
-				localVideo = document.querySelector('#localVideo');
-				remoteVideo = document.querySelector('#remoteVideo');
 				
 				consolelog("Control Page Started");
 				
@@ -108,26 +50,32 @@
 						if(e.which != 13)	
 							keys[e.which] = true;
 
-						socket.emit('command','D;');
+						//socket.emit('command','D;');
 
 						switch(e.which) {
 
 							case 37: // left
-								socket.emit('command', 'T120;');
+								//socket.emit('command', 'T120;');
+								webRTC.sendDirectlyToAll('message','command',{command: 'T120;'});
 								consolelog('Left');
 								break;
 
 							case 38: // up
-								socket.emit('command', 'M112;');
+								//socket.emit('command', 'M112;');
+								webRTC.sendDirectlyToAll('message','command',{command: 'M112;'});
 								consolelog('UP');
 								break;
 
 							case 39: // right
-								socket.emit('command', 'T60;');
+								//socket.emit('command', 'T60;');
+								webRTC.sendDirectlyToAll('message','command',{command: 'T60;'});
+								consolelog('Right');
 								break;
 
 							case 40: // down
-								socket.emit('command', 'M70;');
+								//socket.emit('command', 'M70;');
+								webRTC.sendDirectlyToAll('message','command',{command: 'M70;'});
+								consolelog('Down');
 								break;
 
 							default: return; // exit this handler for other keys
@@ -145,21 +93,25 @@
 						switch(e.which) {
 
 							case 37: // left
-								socket.emit('command', 'T90;');
-								consolelog('Left');
+								//socket.emit('command', 'T90;');
+								webRTC.sendDirectlyToAll('message','command',{command: 'T90;'});
+								//consolelog('Left');
 								break;
 
 							case 38: // up
-								socket.emit('command', 'M90;');
-								consolelog('UP');
+								//socket.emit('command', 'M90;');
+								webRTC.sendDirectlyToAll('message','command',{command: 'M90;'});
+								//consolelog('UP');
 								break;
 
 							case 39: // right
-								socket.emit('command', 'T90;');
+								//socket.emit('command', 'T90;');
+								webRTC.sendDirectlyToAll('message','command',{command: 'T90;'});
 								break;
 
 							case 40: // down
-								socket.emit('command', 'M90;');
+								//socket.emit('command', 'M90;');
+								webRTC.sendDirectlyToAll('message','command',{command: 'M90;'});
 								break;
 
 							default: return; // exit this handler for other keys
@@ -168,22 +120,28 @@
 					}
 				});
 				$("#calibrateESC").click(function(event){
-					consolelog("Call Calibrate");
+					consolelog("Call Calibrate - CURRENTLY DISABLED FROM CONTROLLER PAGE - ROVER ONLY!");
 					//$.post( "command", { command: 'C;' }, function(msg) { /*consolelog(msg.message);*/ } );
-					socket.emit('command','C;');
+					//socket.emit('command','C;');
 				});
 				$("#hideNotes").click(function(event){
 					$("#notesDiv").hide();
 				});
 				$("#pilotControls").mousedown(function(event) {
 					mouseDown = true;
+					
+					//DEPRECATED: No long need to send a mouse down to the arudino. This was to re-attach servo...
 					//$.post("command", {command: 'D;'}, function(msg) { /*consolelog(msg);*/ });
-					socket.emit('command','D;');
+					//socket.emit('command','D;');
 				});
+				/*
+				//DEPRECATED: This is done in document.mouseUp to catch all, in case we are outside of bounds
 				$("#pilotControls").mouseup(function(event) {
 					mouseDown = false;
 					ctx.clearRect(0,0,300,300);
+					
 				});
+				*/
 				document.getElementById('pilotControlsArrows').draggable = false;
 				
 				//Use the mouseup function on document instead of blur
@@ -197,7 +155,8 @@
 					
 					//Center steering when controls are let  off
 					//$.post( "command", { command: 'U;' }, function(msg) { /*consolelog(msg.message);*/ } );
-					socket.emit('command','U;');
+					//socket.emit('command','U;');
+					webRTC.sendDirectlyToAll('message','command',{command: "U;"});
 				});
 				
 				$( '#pilotControls' ).mousemove(function( event ) {
@@ -236,15 +195,15 @@
 					var d = new Date();
 					var now = d.getTime();
 					
-					//Update things ever X milliseconds
-					if(now - milliseconds > 150)
+					//Update things every ___ milliseconds
+					if(now - milliseconds > 200)
 					{
 						//consolelog("r1:"+r1);
 						//consolelog('T'+steering+';');
 						$("#xDisplay").val(steering);
 						$("#yDisplay").val(motor);
 						//$.post( "command", { command: 'T'+steering+';' }, function(msg) { /*consolelog(msg.message);*/ } );
-						socket.emit('command', 'T'+steering+';M'+motor+';');
+						webRTC.sendDirectlyToAll('message','command', {command: 'T'+steering+';M'+motor+';'});
 						//socket.emit('command', 'M'+motor+';');
 						//$.post( "command", { command: 'M'+motor+';' }, function(msg) { /*consolelog(msg.message);*/ } );
 						milliseconds = now;
@@ -267,7 +226,7 @@
 	</head>
 	
 	<body>
-		<h1>Controller</h1>
+		<h1>Oregon Rover</h1>
 		<div id='notesDiv'>
 			<h4>Notes</h4>
 			<ul>
@@ -294,7 +253,7 @@
 		<div id="overrideBumper">
 			<br>Override<br>Bumper
 		</div>
-		<video id='remoteVideo' autoplay muted></video>
+		<div id='remoteVideos' autoplay muted></div>
 		<video id='localVideo' autoplay muted></video>
 	</body>
 </html>
