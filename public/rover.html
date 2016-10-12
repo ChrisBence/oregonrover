@@ -2,12 +2,15 @@
 	<head>
 		<link rel='stylesheet' type='text/css' href='style.css' >
 		<style>
+			body {
+				
+			}
 			#console {
 				width:50%;
 				height:150px;
-				left:25%;
+				left:0%;
 				bottom:0px;
-				background-color:transparent;
+				z-index:1000;
 			}
 			#localVideo {
 				position:fixed;
@@ -16,9 +19,12 @@
 				margin:0px auto;
 			}
 			#remoteVideos {
-				
+				position:fixed;
+				width:50%;
+				left:25%;
+				top:100px;
+				border:1px dashed black;
 			}
-			
 		</style>
 		<meta name="viewport" content="width=device-width, initial-scale=1">
 		<link rel="stylesheet" href="http://code.jquery.com/mobile/1.4.5/jquery.mobile-1.4.5.min.css">
@@ -37,19 +43,23 @@
 			});
 			webRTC.on('readyToCall', function() {
 				webRTC.joinRoom('oregon-rover');
+				consolelog('Join Room');
 			});
-			webRTC.on('channelMessage', function(peer, label, data) {
-				consolelog("Channel Message");
-				if(label !== "command")
-				{
-					consolelog("Not rover");
-					return;
-				}
-				
-				else if(data.type == 'command')
-				{
-					consolelog(data.payload);
-				}
+			/*webRTC.on('createdPeer', function(peer)
+			{
+				consolelog('Peer!');
+				console.log(peer);
+				//webRTC.peer = peer;
+				//webRTC.peer.on('command',function(data) { consolelog('Command!!!');});
+			});*/
+			webRTC.on('channelMessage', function(peer,type,data) {
+				//console.log(data);
+				consolelog("command");
+				//consolelog(data.payload);
+				//payload is the command object
+				$.each(data.payload, function(i,j) {
+					consolelog(i + ", " + j);
+				});
 			});
 			socket.on('arduino', function(msg){
 				consolelog("Arduino: " + msg);
@@ -84,9 +94,9 @@
 		</script>
 	</head>
 	<body>
-		<h1></h1>
+		<h1>Watch out!</h1>
 		<video id='localVideo' autoplay muted width="200"></video>
-		<video id='remoteVideos' autoplay muted width="600"></video>
+		<div id='remoteVideos' autoplay muted width="640" height="480"></div>
 		<button id='test' type='button'>Test!</button>
 		<div id="inputDisplayDiv">
 			<label for='xDisplay'>Steering</label><input type="text" val="" id="xDisplay" /><br>
@@ -94,6 +104,5 @@
 		</div>
 		
 		<textarea id="console"></textarea>
-		
 	</body>
 </html>
